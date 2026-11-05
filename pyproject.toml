@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "forebet-tennis-pipeline"
+version = "0.1.0"
+description = "Forebet Tennis Data Pipeline - Historical scraper with Cloudflare bypass"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "playwright>=1.40.0",
+    "psycopg2-binary>=2.9.9",
+    "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "black", "ruff"]
+
+[project.scripts]
+# Historical scraping (past dates)
+scrape-historical = "scraper:cli_main"
+scrape-batch = "batch_scraper:cli_main"
+
+# Live scraping (current dates)
+scrape-live = "live_scraper:cli_main"
+
+# Database (optional)
+setup-db = "database:main"
+load-to-db = "etl:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
