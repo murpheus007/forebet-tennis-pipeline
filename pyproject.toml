@@ -19,15 +19,15 @@ dev = ["pytest>=7.0", "black", "ruff"]
 
 [project.scripts]
 # Historical scraping (past dates)
-scrape-historical = "scraper:cli_main"
-scrape-batch = "batch_scraper:cli_main"
+scrape-historical = "forebet_tennis_pipeline.scraper:cli_main"
+scrape-batch = "forebet_tennis_pipeline.batch_scraper:cli_main"
 
 # Live scraping (current dates)
-scrape-live = "live_scraper:cli_main"
+scrape-live = "forebet_tennis_pipeline.live_scraper:cli_main"
 
 # Database (optional)
-setup-db = "database:main"
-load-to-db = "etl:main"
+setup-db = "forebet_tennis_pipeline.database:main"
+load-to-db = "forebet_tennis_pipeline.etl:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
