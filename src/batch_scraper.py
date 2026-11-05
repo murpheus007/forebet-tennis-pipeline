@@ -136,6 +136,11 @@ async def worker(worker_id: int, task_queue: asyncio.Queue, results: list, semap
         )
         await setup_stealth_context(context)
         page = await context.new_page()
+        
+        # Block unnecessary resources to reduce Cloudflare fingerprint
+        await page.route("**/*", lambda route: (
+            route.abort() if route.request.resource_type in ["stylesheet", "image", "font", "media", "script"] and not route.request.url.endswith(".js") else route.continue_()
+        ))
 
         while True:
             try:

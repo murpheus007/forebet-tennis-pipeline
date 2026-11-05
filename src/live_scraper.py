@@ -275,6 +275,11 @@ async def main():
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
         """)
         page = await context.new_page()
+        
+        # Block unnecessary resources to reduce Cloudflare fingerprint
+        await page.route("**/*", lambda route: (
+            route.abort() if route.request.resource_type in ["stylesheet", "image", "font", "media", "script"] and not route.request.url.endswith(".js") else route.continue_()
+        ))
 
         try:
             result = await scrape_date(page, date_str)

@@ -364,6 +364,11 @@ async def main():
             window.chrome = { runtime: {} };
         """)
         page = await context.new_page()
+        
+        # Block unnecessary resources to reduce Cloudflare fingerprint
+        await page.route("**/*", lambda route: (
+            route.abort() if route.request.resource_type in ["stylesheet", "image", "font", "media", "script"] and not route.request.url.endswith(".js") else route.continue_()
+        ))
 
         for date_str in dates:
             print(f"\n=== Scraping {date_str} ===")
