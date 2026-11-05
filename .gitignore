@@ -41,7 +41,7 @@ Thumbs.db
 playwright/.cache/
 
 # Data (generated files)
-data/json/*.json
+data/json/**/*.json
 !data/json/reference_2026-01-01.json
 !data/json/.gitkeep
 
