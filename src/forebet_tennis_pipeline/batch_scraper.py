@@ -20,7 +20,8 @@ from scraper import parse_match_block
 
 # ─── Config ───
 BASE_URL = "https://www.forebet.com/en/tennis/predictions/"
-OUTPUT_BASE = Path(__file__).parent.parent / "data" / "json"
+# Go up 3 levels: src/forebet_tennis_pipeline -> src -> project_root
+OUTPUT_BASE = Path(__file__).parent.parent.parent / "data" / "json"
 WORKERS = 3
 
 async def wait_for_cloudflare(page, max_wait: int = 120) -> bool:
