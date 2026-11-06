@@ -29,5 +29,8 @@ scrape-live = "forebet_tennis_pipeline.live_scraper:cli_main"
 setup-db = "forebet_tennis_pipeline.database:main"
 load-to-db = "forebet_tennis_pipeline.etl:main"
 
+# Simulation
+simulate = "forebet_tennis_pipeline.simulation:cli_main"
+
 [tool.setuptools.packages.find]
 where = ["src"]

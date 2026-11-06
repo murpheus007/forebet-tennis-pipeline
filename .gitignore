@@ -63,5 +63,8 @@ temp/
 config/.env
 !config/.env.example
 
+# Simulation output
+simulation_results.txt
+
 # Egg info
 *.egg-info/
