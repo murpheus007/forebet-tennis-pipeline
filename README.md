@@ -1,12 +1,15 @@
-# Forebet Tennis Pipeline
+# Forebet Tennis & Football Pipeline
 
-A complete data pipeline for scraping, storing, and analyzing Forebet tennis predictions.
+A complete data pipeline for scraping, storing, and analyzing Forebet tennis and football predictions.
 
 ## Features
 
-- **Historical Scraper**: Scrapes past dates with Cloudflare bypass
+- **Historical Scraper (Tennis)**: Scrapes past dates with Cloudflare bypass
+- **Historical Scraper (Football 1x2)**: Scrapes football 1x2 predictions for past dates
 - **Date Range Support**: Scrape single dates or ranges (e.g., `2025-01-01` to `2025-12-31`)
-- **Tiebreak Parsing**: Correctly handles concatenated scores (e.g., `47` → `4-3 TB:7-4`)
+- **Parallel Scraping**: 3 workers for fast batch scraping
+- **Tiebreak Parsing** (Tennis): Correctly handles concatenated scores (e.g., `47` → `4-3 TB:7-4`)
+- **Football 1x2 Parsing**: Handles prediction codes (X1-1, 12-1, 21-2, 1X-1), 1x2 odds, avg goals, weather
 - **Football Filtering**: Automatically excludes non-tennis matches (UCL, Us1, etc.)
 - **PostgreSQL Storage**: Normalized schema with indexes
 - **Value Bets View**: Pre-computed `prob * coef >= 120` filter
@@ -19,20 +22,24 @@ A complete data pipeline for scraping, storing, and analyzing Forebet tennis pre
 forebet-tennis-pipeline/
 ├── config/
 │   └── .env.example          # Configuration template
-├── src/
-│   ├── __init__.py
-│   ├── scraper.py            # Historical scraper (single date)
-│   ├── batch_scraper.py      # Parallel batch scraper (date ranges)
-│   ├── live_scraper.py       # Live scraper (current dates)
-│   ├── database.py           # DB connection, schema, views
-│   └── etl.py                # JSON → PostgreSQL loader
 ├── data/
-│   ├── json/                 # Downloaded JSON files
-│   └── reference_2026-01-01.json  # Reference format
-├── scripts/
-├── requirements.txt
-├── pyproject.toml            # Package config with CLI entry points
-└── README.md
+│   └── json/
+│       ├── *.json                    # Tennis historical data
+│       ├── custom/                   # Football 1x2 data (gitignored)
+│       ├── reference_2026-01-01.json # Reference format
+│       └── .gitkeep
+├── src/
+│   └── forebet_tennis_pipeline/
+│       ├── __init__.py
+│       ├── scraper.py            # Tennis historical scraper (single date)
+│       ├── batch_scraper.py      # Tennis parallel batch scraper (date ranges)
+│       ├── football_scraper.py   # Football 1x2 scraper (date ranges)
+│       ├── live_scraper.py       # Tennis live scraper (current dates)
+│       ├── database.py           # DB connection, schema, views
+│       └── etl.py                # JSON → PostgreSQL loader
+├── pyproject.toml                # Package config with CLI entry points
+├── README.md
+└── requirements.txt
 ```
 
 ## Quick Start
@@ -90,7 +97,8 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=forebet_tennis
 DB_USER=postgres
-DB_PASSWORD=your_s...n
+DB_PASSWORD=your_secure_password
+
 # Scraping
 SCRAPE_START_DATE=2025-01-01
 SCRAPE_END_DATE=2025-12-31
@@ -110,19 +118,25 @@ This creates tables: `matches`, views: `value_bets`, `kelly_stakes`
 ### 5. Scrape Data
 
 ```bash
-# Single historical date
+# Tennis - Single historical date
 scrape-historical 2026-01-01
 
-# Sequential historical range (safer for Cloudflare)
+# Tennis - Sequential historical range (safer for Cloudflare)
 scrape-batch --start 2025-01-01 --end 2025-12-31
 
-# Parallel historical range (faster, 3 workers)
+# Tennis - Parallel historical range (faster, 3 workers)
 scrape-batch --start 2025-01-01 --end 2025-12-31 --workers 3
 
-# Full year
+# Tennis - Full year
 scrape-batch --year 2025
 
-# Current/live date
+# Football 1x2 - Single historical date
+scrape-football 2026-11-01
+
+# Football 1x2 - Parallel historical range (faster, 3 workers)
+scrape-football --start 2026-02-01 --end 2026-10-31 --workers 3
+
+# Tennis - Current/live date
 scrape-live
 ```
 
@@ -133,10 +147,10 @@ scrape-live
 load-to-db
 
 # Load specific pattern
-load-to-db --pattern "2025-01-*_historical.json"
+load-to-db --pattern "custom/*.json"
 
-# Load single file
-load-to-db --file data/json/2025-01-01_historical.json
+# Load specific file
+load-to-db --file data/json/2026-01-01_historical.json
 ```
 
 ### 7. Query Results
@@ -148,24 +162,26 @@ psql -U postgres -d forebet_tennis -c "SELECT * FROM value_bets LIMIT 10;"
 ## Database Schema
 
 ### `matches` table
+
 | Column | Type | Description |
 |--------|------|-------------|
 | `match_id` | VARCHAR(50) | Forebet match ID |
 | `match_date` | DATE | Match date |
 | `match_time` | TIME | Match time |
-| `player1`, `player2` | VARCHAR(100) | Player names |
-| `prediction_code` | VARCHAR(20) | e.g., `12-0`, `07.81.50` |
-| `pred_winner` | SMALLINT | 1 or 2 |
-| `pred_score` | VARCHAR(10) | Predicted set score |
-| `avg_games_per_set` | DECIMAL(5,2) | |
+| `player1`, `player2` | VARCHAR(100) | Player/team names |
+| `prediction_code` | VARCHAR(20) | e.g., `12-0`, `07.81.50`, `X1-1` |
+| `pred_winner` | SMALLINT | 1=home, 0=draw, 2=away |
+| `pred_score` | VARCHAR(10) | Predicted score |
+| `avg_games_per_set` | DECIMAL(5,2) | Tennis: avg games/set |
+| `avg_goals` | DECIMAL(5,2) | Football: avg goals |
 | `coef` | DECIMAL(5,2) | Decimal odds |
-| `actual_winner` | SMALLINT | 1 or 2 |
-| `actual_score` | VARCHAR(10) | Actual set score |
+| `actual_winner` | SMALLINT | 1=home, 0=draw, 2=away |
+| `actual_score` | VARCHAR(10) | Actual score |
 | `status` | VARCHAR(20) | FT, Cancl., etc. |
-| `set_scores` | INT[] | Flat array: [h1,a1,h2,a2,...] |
+| `set_scores` | INT[] | Tennis: flat array [h1,a1,h2,a2,...] |
 | `tiebreak_details` | JSONB | Tiebreak info per set |
-| `p1_prob`, `p2_prob` | SMALLINT | Win probabilities |
-| `p1_favorite`, `p2_favorite` | BOOLEAN | Favorite indicator |
+| `p1_prob`, `p2_prob`, `p_draw_prob` | SMALLINT | Win probabilities |
+| `p1_favorite`, `p2_favorite`, `p_draw_favorite` | BOOLEAN | Favorite indicator |
 
 ### Views
 
@@ -174,7 +190,7 @@ psql -U postgres -d forebet_tennis -c "SELECT * FROM value_bets LIMIT 10;"
 SELECT * FROM value_bets;
 ```
 
-**`kelly_stakes`** - Half-Kelly fraction (2% cap):
+**`kelly_stakes`** - Half-Kelly with 2% cap, 100k max:
 ```sql
 SELECT * FROM kelly_stakes;
 ```
@@ -183,14 +199,14 @@ SELECT * FROM kelly_stakes;
 
 ```sql
 -- Today's value bets with Kelly stakes
-SELECT m.player1, m.player2, m.coef, m.p1_prob, m.p2_prob,
+SELECT m.player1, m.player2, m.coef, m.p1_prob, m.p2_prob, m.p_draw_prob,
        v.pred_value, k.kelly_fraction
 FROM matches m
 JOIN value_bets v ON m.id = v.id
 JOIN kelly_stakes k ON m.id = k.id
 WHERE m.match_date = CURRENT_DATE;
 
--- Backtest: All 2025 value bets P&L
+-- Backtest: All value bets P&L
 SELECT 
     match_date,
     COUNT(*) as bets,
@@ -203,9 +219,10 @@ ORDER BY match_date;
 
 ## Scraper Details
 
-### Historical Format (Past Dates)
+### Tennis Historical Format (Past Dates)
 
 The historical page uses CONCATENATED format:
+
 ```
 [0] "L. TienA. Blockx 21/12/2025 18:10"  - players + datetime
 [1] "5644"                               - match_id
@@ -232,10 +249,35 @@ The historical page uses CONCATENATED format:
 | `47`, `34` | `4-3 TB:7-4` (home won 4-3, tiebreak 7-4) |
 | `4`, `2` | `4-2` (no tiebreak) |
 
+### Football 1x2 Format
+
+Football 1x2 predictions use `.rcnt` elements with text format:
+
+```
+Line 0: League code (e.g., "Mx1")
+Line 1: "Team1 Team2 DD/MM/YYYY HH:MM"
+Line 2: Match ID
+Line 3: Prediction code (e.g., "X1-1", "12-1", "21-2", "1X-1")
+Line 4: Predicted score
+Line 5: Coef/odds
+Line 6: Temperature
+Line 7: Avg goals
+Line 8: 1x2 odds (home draw away)
+Line 9: Flags
+Line 9: Status (FT, HT, etc.)
+Line 10: Final score with half-time
+```
+
+**Prediction codes:**
+- `X1-1`: Draw FT, Home HT
+- `12-1`: Home/Draw FT, Home HT
+- `21-2`: Away/Draw FT, Away HT
+- `1X-1`: Home/Draw FT, Home HT
+
 ### Football Filtering
 
 Automatically excludes matches with prediction codes:
-- `X` (draw)
+- `X` (draw only)
 - Team names (e.g., `Liverpool`)
 - Competition codes (e.g., `UCL`, `Us1`)
 

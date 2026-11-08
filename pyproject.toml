@@ -21,6 +21,7 @@ dev = ["pytest>=7.0", "black", "ruff"]
 # Historical scraping (past dates)
 scrape-historical = "forebet_tennis_pipeline.scraper:cli_main"
 scrape-batch = "forebet_tennis_pipeline.batch_scraper:cli_main"
+scrape-football = "forebet_tennis_pipeline.football_scraper:cli_main"
 
 # Live scraping (current dates)
 scrape-live = "forebet_tennis_pipeline.live_scraper:cli_main"
